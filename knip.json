@@ -1,0 +1,5 @@
+{
+	"ignore": ["prettier.config.js", "src/database/schemas/**/*"],
+	"entry": ["src/index.ts"],
+	"project": ["src/**/*.ts"]
+}

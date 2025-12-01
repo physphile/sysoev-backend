@@ -1,0 +1,54 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ESNext"],
+		"types": ["@types/bun"],
+		"allowJs": false,
+		"checkJs": false,
+		"resolveJsonModule": true,
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+
+		"strict": true,
+		"noImplicitAny": true,
+		"strictNullChecks": true,
+		"strictFunctionTypes": true,
+		"strictBindCallApply": true,
+		"strictPropertyInitialization": true,
+		"useUnknownInCatchVariables": true,
+		"alwaysStrict": true,
+
+		"exactOptionalPropertyTypes": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitThis": true,
+		"noPropertyAccessFromIndexSignature": true,
+
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noUncheckedSideEffectImports": true,
+		"noEmitOnError": true,
+
+		"moduleDetection": "force",
+		"verbatimModuleSyntax": true,
+		"useDefineForClassFields": true,
+
+		"outDir": "dist",
+		"rootDir": ".",
+		"removeComments": false,
+		"newLine": "lf",
+
+		"incremental": true,
+		"tsBuildInfoFile": ".tsbuildinfo",
+
+		"skipLibCheck": true,
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true
+	},
+	"include": ["src", "eslint.config.ts", "drizzle.config.ts"],
+	"exclude": ["node_modules", "dist"]
+}
