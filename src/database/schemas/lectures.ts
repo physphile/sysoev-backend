@@ -1,64 +1,45 @@
-import { sql } from "drizzle-orm";
-import { index, integer, pgTable, real, serial, text } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import { index, integer, pgTable, real, serial, text, unique } from "drizzle-orm/pg-core";
 
 import { timestamps } from "./helpers";
 
-export const lectures = pgTable(
+export const topicsTable = pgTable("topics", {
+	id: serial("id").primaryKey(),
+	name: text("name").notNull().unique(),
+	...timestamps,
+});
+
+export const lecturesTable = pgTable(
 	"lectures",
 	{
 		description: text("description"),
 		duration: real("duration").notNull(),
 		fullText: text("full_text").notNull(),
 		id: serial("id").primaryKey(),
+		order: integer("order").notNull(),
 		title: text("title").notNull(),
-		topic: text("topic").notNull(),
+		topicId: integer("topic_id")
+			.references(() => topicsTable.id, { onDelete: "restrict" })
+			.notNull(),
 		...timestamps,
 	},
 	table => [
+		unique("lectures_order_topic_id_unique").on(table.order, table.topicId),
 		index("lectures_search_idx").using(
 			"gin",
 			sql`to_tsvector('russian', coalesce(${table.title}, '') || ' ' || coalesce(${table.fullText}, ''))`
 		),
+		index("lectures_topic_id_idx").on(table.topicId),
 	]
 );
 
-export const lectureWords = pgTable(
-	"lecture_words",
-	{
-		end: real("end").notNull(),
-		id: serial("id").primaryKey(),
-		lectureId: integer("lecture_id")
-			.references(() => lectures.id, { onDelete: "cascade" })
-			.notNull(),
-		logprob: real("logprob").default(0),
-		position: integer("position").notNull(),
-		start: real("start").notNull(),
-		text: text("text").notNull(),
-		type: text("type").notNull(), // 'word' или 'spacing'
-		...timestamps,
-	},
-	table => [
-		index("lecture_words_lecture_idx").on(table.lectureId),
-		index("lecture_words_time_idx").on(table.lectureId, table.start),
-	]
-);
+export const lecturersRelations = relations(lecturesTable, ({ one }) => ({
+	topic: one(topicsTable, {
+		fields: [lecturesTable.topicId],
+		references: [topicsTable.id],
+	}),
+}));
 
-export const lectureSegments = pgTable(
-	"lecture_segments",
-	{
-		endPosition: integer("end_position").notNull(),
-		endTime: real("end_time").notNull(),
-		id: serial("id").primaryKey(),
-		lectureId: integer("lecture_id")
-			.references(() => lectures.id, { onDelete: "cascade" })
-			.notNull(),
-		startPosition: integer("start_position").notNull(),
-		startTime: real("start_time").notNull(),
-		text: text("text").notNull(),
-		...timestamps,
-	},
-	table => [
-		index("segments_lecture_idx").on(table.lectureId),
-		index("segments_search_idx").using("gin", sql`to_tsvector('russian', ${table.text})`),
-	]
-);
+export const topicsRelations = relations(topicsTable, ({ many }) => ({
+	lectures: many(lecturesTable),
+}));

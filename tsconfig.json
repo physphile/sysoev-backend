@@ -49,6 +49,6 @@
 		"allowSyntheticDefaultImports": true,
 		"esModuleInterop": true
 	},
-	"include": ["src", "eslint.config.ts", "drizzle.config.ts", "merge_mp3.ts", "speech_to_text.ts", "db_upload.ts"],
+	"include": ["src", "eslint.config.ts", "drizzle.config.ts", "merge_mp3.ts", "speech_to_text.ts"],
 	"exclude": ["node_modules", "dist"]
 }

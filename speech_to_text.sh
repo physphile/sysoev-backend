@@ -40,7 +40,7 @@ while IFS= read -r -d '' wav_file; do
     echo "Обработка: $wav_file"
 
     # Запускаем node с правильным экранированием пути
-    node speech_to_text.ts "$wav_file"
+    bun --bun speech_to_text.ts "$wav_file"
 
     # Проверяем статус выполнения
     if [ $? -eq 0 ]; then

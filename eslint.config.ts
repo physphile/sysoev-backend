@@ -22,6 +22,7 @@ export default defineConfig([
 			"prettier.config.js",
 			"src/database/schemas/auth.ts",
 			"src/OpenAPI.ts",
+			"db_upload.ts",
 		],
 	},
 	{ files: ["**/*.{ts}"] },

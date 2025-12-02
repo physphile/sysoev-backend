@@ -2,7 +2,8 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
-import { db, lectures, lectureSegments, lectureWords } from "./src/database";
+import { db, lectureSegmentsTable, lecturesTable, lectureWordsTable } from "./src/database";
+import { topicsTable } from "./src/database/schemas/topics";
 
 interface ResponseJson {
 	languageCode: string;
@@ -13,7 +14,6 @@ interface ResponseJson {
 
 interface Word {
 	end: number;
-	logprob: number;
 	start: number;
 	text: string;
 	type: "spacing" | "word";
@@ -71,7 +71,7 @@ function createSegments(words: Word[]): {
 	return segments;
 }
 
-function extractMetadata(dirPath: string): { title: string; topic: string } {
+function extractMetadata(dirPath: string) {
 	const parts = dirPath.split("/");
 	const lectureName = parts.at(-1);
 	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -80,10 +80,11 @@ function extractMetadata(dirPath: string): { title: string; topic: string } {
 	const numberMatch = lectureName?.match(/(\d+)/)?.at(1);
 
 	if (numberMatch === undefined) {
-		return { title: topic, topic };
+		return { order: 1, title: topic, topic };
 	}
 
-	return { title: `${topic}. Беседа №${Number(numberMatch)}`, topic };
+	const order = Number(numberMatch);
+	return { order, title: `Беседа №${order}`, topic };
 }
 
 async function findResponseFiles(dir: string, results: string[] = []): Promise<string[]> {
@@ -135,49 +136,66 @@ async function uploadLecture(dirPath: string) {
 		const txtPath = path.join(dirPath, "response.txt");
 		const jsonPath = path.join(dirPath, "response.json");
 
-		const fullText = await readFile(txtPath, "utf-8");
-		const jsonData: ResponseJson = JSON.parse(await readFile(jsonPath, "utf-8"));
+		const fullText = await readFile(txtPath, "utf8");
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+		const jsonData: ResponseJson = JSON.parse(await readFile(jsonPath, "utf8"));
 
-		const { title, topic } = extractMetadata(dirPath);
+		const { order, title, topic } = extractMetadata(dirPath);
 
 		const duration = jsonData.words.length > 0 ? jsonData.words.at(-1).end : 0;
 
+		const [topicRecord] = await db
+			.insert(topicsTable)
+			.values({ name: topic })
+			.onConflictDoUpdate({ set: { name: topic }, target: topicsTable.name })
+			.returning({ id: topicsTable.id });
+
+		const values = {
+			duration,
+			fullText,
+			order,
+			title,
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+			topicId: topicRecord!.id,
+		};
+
 		const [lecture] = await db
-			.insert(lectures)
-			.values({
-				duration,
-				fullText,
-				title,
-				topic,
+			.insert(lecturesTable)
+			.values(values)
+			.onConflictDoUpdate({
+				set: values,
+				target: [lecturesTable.order, lecturesTable.topicId],
 			})
-			.returning();
+			.returning({ id: lecturesTable.id });
 
-		console.log(`  ✓ Создана лекция ID=${lecture.id}: ${title}`);
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+		console.log(`  ✓ Создана лекция ID=${lecture!.id}: ${title}`);
 
-		const BATCH_SIZE = 1000;
-		for (let i = 0; i < jsonData.words.length; i += BATCH_SIZE) {
-			const batch = jsonData.words.slice(i, i + BATCH_SIZE);
-			const wordsToInsert = batch.map((word, idx) => ({
+		const SEGMENT_SIZE = 1000;
+		for (let segmentIndex = 0; segmentIndex < jsonData.words.length; segmentIndex += SEGMENT_SIZE) {
+			const segment = jsonData.words.slice(segmentIndex, segmentIndex + SEGMENT_SIZE);
+			const wordsToInsert = segment.map((word, wordIndex) => ({
 				end: word.end,
-				lectureId: lecture.id,
-				logprob: word.logprob,
-				position: i + idx,
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+				lectureId: lecture!.id,
+				position: segmentIndex + wordIndex,
 				start: word.start,
 				text: word.text,
 				type: word.type,
 			}));
 
-			await db.insert(lectureWords).values(wordsToInsert);
+			await db.insert(lectureWordsTable).values(wordsToInsert);
 		}
 
 		console.log(`  ✓ Загружено ${jsonData.words.length} слов`);
 
 		const segments = createSegments(jsonData.words);
 		for (const segment of segments) {
-			await db.insert(lectureSegments).values({
+			await db.insert(lectureSegmentsTable).values({
 				endPosition: segment.endPosition,
 				endTime: segment.endTime,
-				lectureId: lecture.id,
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+				lectureId: lecture!.id,
 				startPosition: segment.startPosition,
 				startTime: segment.startTime,
 				text: segment.text,
@@ -191,7 +209,9 @@ async function uploadLecture(dirPath: string) {
 	}
 }
 
-main().catch(error => {
+try {
+	await main();
+} catch (error) {
 	console.error("Критическая ошибка:", error);
 	process.exit(1);
-});
+}
