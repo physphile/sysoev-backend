@@ -44,3 +44,7 @@ package-lock.json
 .vscode
 .env
 drizzle
+
+*.wav
+public/lectures
+public/lectures.7z

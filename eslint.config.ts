@@ -48,7 +48,7 @@ export default defineConfig([
 			"@typescript-eslint/explicit-module-boundary-types": "off",
 			"@typescript-eslint/naming-convention": "off",
 			"@typescript-eslint/no-magic-numbers": "off",
-			"@typescript-eslint/prefer-readonly-parameter-types": "warn",
+			"@typescript-eslint/prefer-readonly-parameter-types": "off",
 			"@typescript-eslint/restrict-template-expressions": [
 				"error",
 				{
