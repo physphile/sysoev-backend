@@ -17,6 +17,7 @@ export const lecturesTable = pgTable(
 		fullText: text("full_text").notNull(),
 		id: serial("id").primaryKey(),
 		order: integer("order").notNull(),
+		src: text("src").notNull(),
 		title: text("title").notNull(),
 		topicId: integer("topic_id")
 			.references(() => topicsTable.id, { onDelete: "restrict" })

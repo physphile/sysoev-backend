@@ -3,7 +3,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { db, lectureSegmentsTable, lecturesTable, lectureWordsTable } from "./src/database";
-import { topicsTable } from "./src/database/schemas/topics";
+import { topicsTable } from "./src/database/schemas";
 
 interface ResponseJson {
 	languageCode: string;
@@ -19,13 +19,15 @@ interface Word {
 	type: "spacing" | "word";
 }
 
-function createSegments(words: Word[]): {
+const createSegments = (
+	words: Word[]
+): {
 	endPosition: number;
 	endTime: number;
 	startPosition: number;
 	startTime: number;
 	text: string;
-}[] {
+}[] => {
 	const segments: {
 		endPosition: number;
 		endTime: number;
@@ -69,9 +71,9 @@ function createSegments(words: Word[]): {
 	}
 
 	return segments;
-}
+};
 
-function extractMetadata(dirPath: string) {
+const extractMetadata = (dirPath: string) => {
 	const parts = dirPath.split("/");
 	const lectureName = parts.at(-1);
 	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -85,9 +87,9 @@ function extractMetadata(dirPath: string) {
 
 	const order = Number(numberMatch);
 	return { order, title: `Беседа №${order}`, topic };
-}
+};
 
-async function findResponseFiles(dir: string, results: string[] = []): Promise<string[]> {
+const findResponseFiles = async (dir: string, results: string[] = []): Promise<string[]> => {
 	const entries = await readdir(dir);
 
 	const hasResponseTxt = entries.includes("response.txt");
@@ -110,29 +112,29 @@ async function findResponseFiles(dir: string, results: string[] = []): Promise<s
 	}
 
 	return results;
-}
+};
 
-async function main() {
-	const lecturesDir = path.join(process.cwd(), "public", "lectures");
+const findMp3File = async (dirPath: string): Promise<`${string}.mp3` | undefined> => {
+	const entries = await readdir(dirPath);
+	const mp3File = entries.find((entry): entry is `${string}.mp3` => entry.toLowerCase().endsWith(".mp3"));
+	return mp3File;
+};
 
-	console.log(`Поиск файлов в ${lecturesDir}...\n`);
-
-	const directories = await findResponseFiles(lecturesDir);
-
-	console.log(`Найдено ${directories.length} директорий с лекциями\n`);
-
-	for (const dir of directories) {
-		await uploadLecture(dir);
-	}
-
-	console.log("✓ Все лекции успешно загружены!");
-	process.exit(0);
-}
-
-async function uploadLecture(dirPath: string) {
+const uploadLecture = async (dirPath: string) => {
 	console.log(`Обработка: ${dirPath}`);
 
 	try {
+		const mp3File = await findMp3File(dirPath);
+		if (mp3File === undefined) {
+			console.error(`  ✗ Файл .mp3 не найден в ${dirPath}`);
+			return;
+		}
+
+		const publicDir = path.join(process.cwd(), "public");
+		const src = "/" + path.relative(publicDir, path.join(dirPath, mp3File));
+
+		console.log(`  ✓ Файл .mp3 найден: ${src}`);
+
 		const txtPath = path.join(dirPath, "response.txt");
 		const jsonPath = path.join(dirPath, "response.json");
 
@@ -142,18 +144,24 @@ async function uploadLecture(dirPath: string) {
 
 		const { order, title, topic } = extractMetadata(dirPath);
 
-		const duration = jsonData.words.length > 0 ? jsonData.words.at(-1).end : 0;
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+		const duration = jsonData.words.length > 0 ? jsonData.words.at(-1)!.end : 0;
+
+		const topicValues = {
+			name: topic,
+		};
 
 		const [topicRecord] = await db
 			.insert(topicsTable)
-			.values({ name: topic })
-			.onConflictDoUpdate({ set: { name: topic }, target: topicsTable.name })
+			.values(topicValues)
+			.onConflictDoUpdate({ set: topicValues, target: topicsTable.name })
 			.returning({ id: topicsTable.id });
 
-		const values = {
+		const lectureValues = {
 			duration,
 			fullText,
 			order,
+			src,
 			title,
 			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 			topicId: topicRecord!.id,
@@ -161,9 +169,9 @@ async function uploadLecture(dirPath: string) {
 
 		const [lecture] = await db
 			.insert(lecturesTable)
-			.values(values)
+			.values(lectureValues)
 			.onConflictDoUpdate({
-				set: values,
+				set: lectureValues,
 				target: [lecturesTable.order, lecturesTable.topicId],
 			})
 			.returning({ id: lecturesTable.id });
@@ -206,8 +214,26 @@ async function uploadLecture(dirPath: string) {
 		console.log(`  ✓ Лекция "${title}" успешно загружена!\n`);
 	} catch (error) {
 		console.error(`  ✗ Ошибка при обработке ${dirPath}:`, error);
+		process.exit(1);
 	}
-}
+};
+
+const main = async () => {
+	const lecturesDir = path.join(process.cwd(), "public", "lectures");
+
+	console.log(`Поиск файлов в ${lecturesDir}...\n`);
+
+	const directories = await findResponseFiles(lecturesDir);
+
+	console.log(`Найдено ${directories.length} директорий с лекциями\n`);
+
+	for (const dir of directories) {
+		await uploadLecture(dir);
+	}
+
+	console.log("✓ Все лекции успешно загружены!");
+	process.exit(0);
+};
 
 try {
 	await main();

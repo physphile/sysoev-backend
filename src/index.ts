@@ -3,6 +3,7 @@ import { swagger } from "@elysiajs/swagger";
 import { asc, count, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { createSelectSchema } from "drizzle-typebox";
 import { Elysia, t } from "elysia";
+import path from "node:path";
 
 import { betterAuth } from "./betterAuth";
 import { lectureSegmentsTable, lecturesTable, topicsTable } from "./database";
@@ -33,6 +34,12 @@ new Elysia()
 		})
 	)
 	.use(betterAuth)
+	.get("/static/*", ({ params }) => {
+		const pathname = decodeURIComponent(params["*"]);
+		const filPath = path.join(process.cwd(), "public", pathname);
+		const file = Bun.file(filPath);
+		return new Response(file);
+	})
 	.get("/user", ({ user }) => user, {
 		auth: true,
 	})

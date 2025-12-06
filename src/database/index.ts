@@ -1,2 +1,2 @@
 export { db } from "./db";
-export { lectureSegmentsTable, lecturesTable, topicsTable } from "./schemas";
+export { lectureSegmentsTable, lecturesTable, lectureWordsTable, topicsTable } from "./schemas";
